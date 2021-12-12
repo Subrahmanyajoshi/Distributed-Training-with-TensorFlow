@@ -7,6 +7,8 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
@@ -83,11 +85,18 @@ class Trainer(object):
 
         num_features = min(len(self.tokenizer.word_index) + 1, Trainer.TOP_K)
 
+        strategy = tf.distribute.experimental.ParameterServerStrategy(
+            tf.distribute.cluster_resolver.TFConfigClusterResolver(),
+            variable_partitioner=variable_partitioner)
+        coordinator = tf.distribute.experimental.coordinator.ClusterCoordinator(
+            strategy)
+
         model = HybridModel(num_features=num_features,
                             max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(Namespace(**{'optimizer': 'adam',
                                                                                                 'loss': "binary_crossentropy",
                                                                                                 'metrics': ["accuracy"],
-                                                                                                'embedding_dim': 200}))
+                                                                                                'embedding_dim': 200,
+                                                                                                'strategy': strategy}))
         model.summary()
         print(f"[Trainer::train] Built Hybrid model")
 
