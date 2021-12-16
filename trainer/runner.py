@@ -78,6 +78,9 @@ class Trainer(object):
 
         return X_train, y_train, X_val, y_val
 
+    def input_fn():
+        pass
+
     def train(self):
 
         print("[Trainer::train] Loaded data")
@@ -108,15 +111,10 @@ class Trainer(object):
                                              labels=y_val,
                                              batch_size=128)
 
+        keras_estimator = tf.keras.estimator.model_to_estimator(keras_model=model)
+
         print("[Trainer::train] Started training")
-        history = model.fit(
-            train_generator,
-            validation_data=validation_generator,
-            epochs=10,
-            steps_per_epoch=2500,
-            workers=6,
-            use_multiprocessing=True
-        )
+        keras_estimator.train_and_evalute(input_fn=input_fn, steps=500)
 
         # save model as hdf5 file
         os.makedirs('trained_model')
