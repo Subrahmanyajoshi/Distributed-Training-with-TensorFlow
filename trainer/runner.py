@@ -29,6 +29,15 @@ class Trainer(object):
     TOP_K = 20000
     MAX_SEQUENCE_LENGTH = 500
 
+    # Determine CSV, label, and key columns
+    CSV_COLUMNS = ["input",
+                   "label"]
+    LABEL_COLUMN = "label"
+
+    # Set default values for each CSV column.
+    # Treat is_male and plurality as strings.
+    DEFAULTS = [["null"], [0]]
+
     def __init__(self, arguments: Namespace):
         self.tokenizer = Tokenizer(num_words=Trainer.TOP_K)
         self.data_dir = arguments.data_dir
@@ -78,8 +87,26 @@ class Trainer(object):
 
         return X_train, y_train, X_val, y_val
 
-    def input_fn():
-        pass
+    @staticmethod
+    def features_and_labels(row_data):
+        label = row_data.pop(Trainer.LABEL_COLUMN)
+        return row_data, label
+
+    @staticmethod
+    def input_fn(file: str, batch_size: int,  mode: str = 'eval'):
+        dataset = tf.data.experimental.make_csv_dataset(
+            file_pattern=file,
+            batch_size=batch_size,
+            column_names=Trainer.CSV_COLUMNS,
+            column_defaults=Trainer.DEFAULTS)
+
+        dataset = dataset.map(map_func=Trainer.features_and_labels)
+
+        if mode == 'train':
+            dataset = dataset.shuffle(buffer_size=1000).repeat()
+
+        dataset = dataset.prefetch(buffer_size=1)
+        return dataset
 
     def train(self):
 
@@ -88,18 +115,11 @@ class Trainer(object):
 
         num_features = min(len(self.tokenizer.word_index) + 1, Trainer.TOP_K)
 
-        strategy = tf.distribute.experimental.ParameterServerStrategy(
-            tf.distribute.cluster_resolver.TFConfigClusterResolver(),
-            variable_partitioner=variable_partitioner)
-        coordinator = tf.distribute.experimental.coordinator.ClusterCoordinator(
-            strategy)
-
         model = HybridModel(num_features=num_features,
                             max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(Namespace(**{'optimizer': 'adam',
                                                                                                 'loss': "binary_crossentropy",
                                                                                                 'metrics': ["accuracy"],
-                                                                                                'embedding_dim': 200,
-                                                                                                'strategy': strategy}))
+                                                                                                'embedding_dim': 200}))
         model.summary()
         print(f"[Trainer::train] Built Hybrid model")
 
