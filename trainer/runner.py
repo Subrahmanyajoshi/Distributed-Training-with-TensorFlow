@@ -110,6 +110,8 @@ class Trainer(object):
 
     def train(self):
 
+        tf.data.Dataset.fr
+
         print("[Trainer::train] Loaded data")
         X_train, y_train, X_val, y_val = self.preprocess()
 
@@ -123,18 +125,15 @@ class Trainer(object):
         model.summary()
         print(f"[Trainer::train] Built Hybrid model")
 
-        print("[Trainer::train] Creating train and validation generators...")
-        train_generator = DataGenerator(input_text=X_train,
-                                        labels=y_train,
-                                        batch_size=128)
-        validation_generator = DataGenerator(input_text=X_val,
-                                             labels=y_val,
-                                             batch_size=128)
-
-        keras_estimator = tf.keras.estimator.model_to_estimator(keras_model=model)
-
         print("[Trainer::train] Started training")
-        keras_estimator.train_and_evalute(input_fn=input_fn, steps=500)
+        history = model.fit(
+            train_generator,
+            validation_data=validation_generator,
+            epochs=10,
+            steps_per_epoch=2500,
+            workers=6,
+            use_multiprocessing=True
+        )
 
         # save model as hdf5 file
         os.makedirs('trained_model')
