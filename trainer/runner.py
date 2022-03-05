@@ -7,12 +7,12 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-
+from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from trainer.data_generator import DataGenerator
+from tf_datasets import NumpyArrayDataset
+from trainer.gcs_callback import GCSCallback
 from trainer.models import HybridModel
 
 
@@ -29,18 +29,10 @@ class Trainer(object):
     TOP_K = 20000
     MAX_SEQUENCE_LENGTH = 500
 
-    # Determine CSV, label, and key columns
-    CSV_COLUMNS = ["input",
-                   "label"]
-    LABEL_COLUMN = "label"
-
-    # Set default values for each CSV column.
-    # Treat is_male and plurality as strings.
-    DEFAULTS = [["null"], [0]]
-
     def __init__(self, arguments: Namespace):
         self.tokenizer = Tokenizer(num_words=Trainer.TOP_K)
         self.data_dir = arguments.data_dir
+        self.batch_size = arguments.batch_size
         self.output_dir = os.path.join(arguments.save_dir, f"{datetime.now().strftime('%Y_%m_%d-%H:%M:%S')}")
 
     @staticmethod
@@ -87,52 +79,35 @@ class Trainer(object):
 
         return X_train, y_train, X_val, y_val
 
-    @staticmethod
-    def features_and_labels(row_data):
-        label = row_data.pop(Trainer.LABEL_COLUMN)
-        return row_data, label
-
-    @staticmethod
-    def input_fn(file: str, batch_size: int,  mode: str = 'eval'):
-        dataset = tf.data.experimental.make_csv_dataset(
-            file_pattern=file,
-            batch_size=batch_size,
-            column_names=Trainer.CSV_COLUMNS,
-            column_defaults=Trainer.DEFAULTS)
-
-        dataset = dataset.map(map_func=Trainer.features_and_labels)
-
-        if mode == 'train':
-            dataset = dataset.shuffle(buffer_size=1000).repeat()
-
-        dataset = dataset.prefetch(buffer_size=1)
-        return dataset
-
     def train(self):
-
-        tf.data.Dataset.fr
 
         print("[Trainer::train] Loaded data")
         X_train, y_train, X_val, y_val = self.preprocess()
 
+        train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=self.batch_size, mode='train')
+        val_dataset = NumpyArrayDataset.input_fn(X=X_val, y=y_val, batch_size=self.batch_size, mode='eval')
+
         num_features = min(len(self.tokenizer.word_index) + 1, Trainer.TOP_K)
 
         model = HybridModel(num_features=num_features,
-                            max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(Namespace(**{'optimizer': 'adam',
-                                                                                                'loss': "binary_crossentropy",
-                                                                                                'metrics': ["accuracy"],
-                                                                                                'embedding_dim': 200}))
+                            max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(optimizer='adam',
+                                                                                   loss="binary_crossentropy",
+                                                                                   metrics=["accuracy"],
+                                                                                   embedding_dim=200)
         model.summary()
         print(f"[Trainer::train] Built Hybrid model")
 
+        cp_callback = ModelCheckpoint(filepath='/tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
+                                      save_freq='epoch', verbose=1, period=1,
+                                      save_best_only=False, save_weights_only=True)
+        gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints', bucket_name='text-analysis-323506')
+
         print("[Trainer::train] Started training")
         history = model.fit(
-            train_generator,
-            validation_data=validation_generator,
+            train_dataset,
+            validation_data=val_dataset,
             epochs=10,
-            steps_per_epoch=2500,
-            workers=6,
-            use_multiprocessing=True
+            callbacks=[cp_callback, gcs_callback]
         )
 
         # save model as hdf5 file
@@ -158,6 +133,8 @@ def main():
     parser.add_argument('--data-dir', type=str, help='GCS location, where data is stored',
                         required=True)
     parser.add_argument('--save-dir', type=str, help='GCS location to store trained model',
+                        required=True)
+    parser.add_argument('--batch-size', type=str, help='batch size',
                         required=True)
 
     args = parser.parse_args()
