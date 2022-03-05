@@ -1,5 +1,6 @@
 import argparse
 import os
+import pickle
 import zipfile
 
 from argparse import Namespace
@@ -14,7 +15,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from tf_datasets import NumpyArrayDataset
+from trainer.tf_datasets import NumpyArrayDataset
 from trainer.gcs_callback import GCSCallback
 from trainer.models import HybridModel
 
@@ -54,6 +55,12 @@ class Trainer(object):
             zip_ref.extractall('./')
         os.system('rm -f train_val.zip')
 
+    def save_tokenizer(self):
+        tokenizer_pickle = TokenizerDetails(tokenizer=self.tokenizer, top_k=Trainer.TOP_K,
+                                            max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH)
+        with open('parser_output/tokenizer.pickle', 'wb') as handle:
+            pickle.dump(tokenizer_pickle, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
     def preprocess(self) -> Tuple:
         train_df = pd.read_csv('train_text.csv.gz')
         val_df = pd.read_csv('val_text.csv.gz')
@@ -84,14 +91,21 @@ class Trainer(object):
 
     def train(self):
 
+        self.load_data()
         print("[Trainer::train] Loaded data")
+        os.makedirs('parser_output', exist_ok=True)
+
         X_train, y_train, X_val, y_val = self.preprocess()
+
+        self.save_tokenizer()
+        print(f"Dumping tokenizer pickle file to {self.output_dir}")
+        os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
 
         """ Mirrored Strategy """
         # Use mirrored strategy to distribute training across multiple GPUs
         mirrored_strategy = tf.distribute.MirroredStrategy()
 
-        """ TPU Strategy"""
+        """ TPU Strategy """
         # Use TPU strategy while running training on a TPU
         # tpu_strategy = tf.distribute.TPUStrategy()
 
