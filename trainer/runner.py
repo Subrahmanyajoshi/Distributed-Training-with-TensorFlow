@@ -1,12 +1,15 @@
 import argparse
 import os
 import zipfile
+
 from argparse import Namespace
 from datetime import datetime
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -84,43 +87,58 @@ class Trainer(object):
         print("[Trainer::train] Loaded data")
         X_train, y_train, X_val, y_val = self.preprocess()
 
-        train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=self.batch_size, mode='train')
-        val_dataset = NumpyArrayDataset.input_fn(X=X_val, y=y_val, batch_size=self.batch_size, mode='eval')
+        """ Mirrored Strategy """
+        # Use mirrored strategy to distribute training across multiple GPUs
+        mirrored_strategy = tf.distribute.MirroredStrategy()
 
-        num_features = min(len(self.tokenizer.word_index) + 1, Trainer.TOP_K)
+        """ TPU Strategy"""
+        # Use TPU strategy while running training on a TPU
+        # tpu_strategy = tf.distribute.TPUStrategy()
 
-        model = HybridModel(num_features=num_features,
-                            max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(optimizer='adam',
-                                                                                   loss="binary_crossentropy",
-                                                                                   metrics=["accuracy"],
-                                                                                   embedding_dim=200)
-        model.summary()
-        print(f"[Trainer::train] Built Hybrid model")
+        with mirrored_strategy.scope():
 
-        cp_callback = ModelCheckpoint(filepath='/tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
-                                      save_freq='epoch', verbose=1, period=1,
-                                      save_best_only=False, save_weights_only=True)
-        gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints', bucket_name='text-analysis-323506')
+            # Updating batch size by multiplying it with the number of accelerators available
+            batch_size = self.batch_size * mirrored_strategy.num_replicas_in_sync
 
-        print("[Trainer::train] Started training")
-        history = model.fit(
-            train_dataset,
-            validation_data=val_dataset,
-            epochs=10,
-            callbacks=[cp_callback, gcs_callback]
-        )
+            train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=batch_size, mode='train')
+            val_dataset = NumpyArrayDataset.input_fn(X=X_val, y=y_val, batch_size=batch_size, mode='eval')
 
-        # save model as hdf5 file
-        os.makedirs('trained_model')
-        os.makedirs(os.path.join('trained_model', datetime.now().strftime("%Y_%m_%d-%H:%M:%S")))
-        model_path = os.path.join('trained_model', f"Hybrid_{Trainer.model_NAME}")
-        model.save_weights(model_path)
+            num_features = min(len(self.tokenizer.word_index) + 1, Trainer.TOP_K)
 
-        print(f"[Trainer::train] Copying trained model to {self.output_dir}")
-        os.system('gsutil -m mv trained_model {self.output_dir}')
+            print(f"[Trainer::train] Built Hybrid model")
 
-        print("Saving model in TF saved model format")
-        model.save(os.path.join(self.output_dir, f"{datetime.now().strftime('%Y_%m_%d-%H:%M:%S')}", "saved_model"))
+            cp_callback = ModelCheckpoint(filepath='/tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
+                                          save_freq='epoch', verbose=1, period=1,
+                                          save_best_only=False, save_weights_only=True)
+            gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints',
+                                       bucket_name='text-analysis-323506')
+
+            model = HybridModel(num_features=num_features,
+                                max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(optimizer='adam',
+                                                                                       loss="binary_crossentropy",
+                                                                                       metrics=["accuracy"],
+                                                                                       embedding_dim=200)
+            model.summary()
+
+            print("[Trainer::train] Started training")
+            _ = model.fit(
+                train_dataset,
+                validation_data=val_dataset,
+                epochs=10,
+                callbacks=[cp_callback, gcs_callback]
+            )
+
+            # save model as hdf5 file
+            os.makedirs('trained_model')
+            os.makedirs(os.path.join('trained_model', datetime.now().strftime("%Y_%m_%d-%H:%M:%S")))
+            model_path = os.path.join('trained_model', f"Hybrid_{Trainer.model_NAME}")
+            model.save_weights(model_path)
+
+            print(f"[Trainer::train] Copying trained model to {self.output_dir}")
+            os.system('gsutil -m mv trained_model {self.output_dir}')
+
+            print("Saving model in TF saved model format")
+            model.save(os.path.join(self.output_dir, f"{datetime.now().strftime('%Y_%m_%d-%H:%M:%S')}", "saved_model"))
 
 
 def main():
