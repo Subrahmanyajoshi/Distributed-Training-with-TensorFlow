@@ -15,9 +15,9 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from trainer.tf_datasets import NumpyArrayDataset
-from trainer.gcs_callback import GCSCallback
-from trainer.models import HybridModel
+from trainer.helpers.tf_datasets import NumpyArrayDataset
+from trainer.helpers.gcs_callback import GCSCallback
+from trainer.helpers.models import HybridModel
 
 # Disable tensorflow debugging information
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -116,7 +116,7 @@ class Trainer(object):
 
         with mirrored_strategy.scope():
 
-            Updating batch size by multiplying it with the number of accelerators available
+            # Updating batch size by multiplying it with the number of accelerators available
             batch_size = self.batch_size * mirrored_strategy.num_replicas_in_sync
 
             train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=batch_size, mode='train')
