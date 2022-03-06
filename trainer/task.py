@@ -19,6 +19,10 @@ from trainer.tf_datasets import NumpyArrayDataset
 from trainer.gcs_callback import GCSCallback
 from trainer.models import HybridModel
 
+# Disable tensorflow debugging information
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ["KMP_SETTINGS"] = "false"
+
 
 class TokenizerDetails(object):
 
@@ -94,6 +98,7 @@ class Trainer(object):
         self.load_data()
         print("[Trainer::train] Loaded data")
         os.makedirs('parser_output', exist_ok=True)
+        os.makedirs('/tmp/checkpoints', exist_ok=True)
 
         X_train, y_train, X_val, y_val = self.preprocess()
 
@@ -111,7 +116,7 @@ class Trainer(object):
 
         with mirrored_strategy.scope():
 
-            # Updating batch size by multiplying it with the number of accelerators available
+            Updating batch size by multiplying it with the number of accelerators available
             batch_size = self.batch_size * mirrored_strategy.num_replicas_in_sync
 
             train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=batch_size, mode='train')
@@ -121,7 +126,7 @@ class Trainer(object):
 
             print(f"[Trainer::train] Built Hybrid model")
 
-            cp_callback = ModelCheckpoint(filepath='/tmp/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
+            cp_callback = ModelCheckpoint(filepath='/tmp/checkpoints/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
                                           save_freq='epoch', verbose=1, period=1,
                                           save_best_only=False, save_weights_only=True)
             gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints',
@@ -138,21 +143,11 @@ class Trainer(object):
             _ = model.fit(
                 train_dataset,
                 validation_data=val_dataset,
-                epochs=10,
+                epochs=3,
                 callbacks=[cp_callback, gcs_callback]
             )
 
-            # save model as hdf5 file
-            os.makedirs('trained_model')
-            os.makedirs(os.path.join('trained_model', datetime.now().strftime("%Y_%m_%d-%H:%M:%S")))
-            model_path = os.path.join('trained_model', f"Hybrid_{Trainer.model_NAME}")
-            model.save_weights(model_path)
-
-            print(f"[Trainer::train] Copying trained model to {self.output_dir}")
-            os.system('gsutil -m mv trained_model {self.output_dir}')
-
-            print("Saving model in TF saved model format")
-            model.save(os.path.join(self.output_dir, f"{datetime.now().strftime('%Y_%m_%d-%H:%M:%S')}", "saved_model"))
+            model.save(self.output_dir)
 
 
 def main():
@@ -166,7 +161,7 @@ def main():
                         required=True)
     parser.add_argument('--save-dir', type=str, help='GCS location to store trained model',
                         required=True)
-    parser.add_argument('--batch-size', type=str, help='batch size',
+    parser.add_argument('--batch-size', type=int, help='batch size',
                         required=True)
 
     args = parser.parse_args()

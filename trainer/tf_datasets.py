@@ -30,7 +30,7 @@ class CSVDataset(object):
         dataset = dataset.map(map_func=CSVDataset.features_and_labels)
 
         if mode == 'train':
-            dataset = dataset.shuffle(buffer_size=batch_size).repeat()
+            dataset = dataset.shuffle(buffer_size=batch_size)
 
         dataset = dataset.prefetch(buffer_size=batch_size)
         return dataset
@@ -43,7 +43,7 @@ class NumpyArrayDataset(object):
         dataset = tf.data.Dataset.from_tensor_slices((X, y))
 
         if mode == 'train':
-            dataset = dataset.shuffle(buffer_size=batch_size).repeat()
+            dataset = dataset.shuffle(buffer_size=batch_size)
 
         dataset = dataset.batch(batch_size=batch_size)
         dataset = dataset.prefetch(buffer_size=batch_size)
@@ -66,7 +66,7 @@ class DataFrameDataset(object):
         dataset = dataset.map(map_func=DataFrameDataset.features_and_labels)
 
         if mode == 'train':
-            dataset = dataset.shuffle(buffer_size=batch_size).repeat()
+            dataset = dataset.shuffle(buffer_size=batch_size)
 
         dataset = dataset.prefetch(buffer_size=batch_size)
         return dataset
