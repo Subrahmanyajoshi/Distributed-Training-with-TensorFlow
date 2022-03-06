@@ -144,6 +144,7 @@ class Trainer(object):
                 train_dataset,
                 validation_data=val_dataset,
                 epochs=3,
+                steps_per_epoch=500,
                 callbacks=[cp_callback, gcs_callback]
             )
 
