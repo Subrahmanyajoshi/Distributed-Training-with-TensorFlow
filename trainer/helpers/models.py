@@ -1,10 +1,7 @@
 from typing import List
 
-import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
-
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 
 class HybridModel(object):
