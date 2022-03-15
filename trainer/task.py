@@ -1,6 +1,7 @@
 import argparse
 import os
 import pickle
+import sys
 import zipfile
 
 from argparse import Namespace
@@ -15,9 +16,13 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from trainer.helpers.tf_datasets import NumpyArrayDataset
 from trainer.helpers.gcs_callback import GCSCallback
+
+sys.path.append('/content/Distributed-Training-with-Tensorflow')
+
+from trainer.helpers.tf_datasets import NumpyArrayDataset
 from trainer.helpers.models import HybridModel
+
 
 # Disable tensorflow debugging information
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -53,11 +58,11 @@ class Trainer(object):
 
     def load_data(self):
         print(f"[Trainer::load_data] Copying data from {self.data_dir} to here...")
-        os.system(f"gsutil -m cp -r "
-                  f"{os.path.join(self.data_dir, 'train_val.zip')} ./")
-        with zipfile.ZipFile('train_val.zip', 'r') as zip_ref:
+        # os.system(f"gsutil -m cp -r "
+        #           f"{os.path.join(self.data_dir, 'train_val.zip')} ./")
+        # with zipfile.ZipFile('train_val.zip', 'r') as zip_ref:
+        with zipfile.ZipFile(os.path.join(self.data_dir, 'train_val.zip'), 'r') as zip_ref:
             zip_ref.extractall('./')
-        os.system('rm -f train_val.zip')
 
     def save_tokenizer(self):
         tokenizer_pickle = TokenizerDetails(tokenizer=self.tokenizer, top_k=Trainer.TOP_K,
@@ -115,7 +120,6 @@ class Trainer(object):
         # tpu_strategy = tf.distribute.TPUStrategy()
 
         with mirrored_strategy.scope():
-
             # Updating batch size by multiplying it with the number of accelerators available
             batch_size = self.batch_size * mirrored_strategy.num_replicas_in_sync
 
@@ -126,11 +130,13 @@ class Trainer(object):
 
             print(f"[Trainer::train] Built Hybrid model")
 
-            cp_callback = ModelCheckpoint(filepath='/tmp/checkpoints/model.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_accuracy',
+            cp_callback = ModelCheckpoint(filepath='/tmp/checkpoints/model.{epoch:02d}-{val_loss:.2f}.hdf5',
+                                          monitor='val_accuracy',
                                           save_freq='epoch', verbose=1, period=1,
                                           save_best_only=False, save_weights_only=True)
-            gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints',
-                                       bucket_name='text-analysis-323506')
+
+            # gcs_callback = GCSCallback(cp_path='gs://text-analysis-323506/checkpoints',
+            #                            bucket_name='text-analysis-323506')
 
             model = HybridModel(num_features=num_features,
                                 max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH).build(optimizer='adam',
@@ -145,7 +151,7 @@ class Trainer(object):
                 validation_data=val_dataset,
                 epochs=3,
                 steps_per_epoch=1024,
-                callbacks=[cp_callback, gcs_callback]
+                callbacks=[cp_callback]
             )
 
             model.save(self.output_dir)
@@ -154,10 +160,6 @@ class Trainer(object):
 def main():
     parser = argparse.ArgumentParser()
     # Input Arguments
-    parser.add_argument('--package-path', help='GCS or local path to training data',
-                        required=False)
-    parser.add_argument('--job-dir', type=str, help='GCS location to write checkpoints and export models',
-                        required=False)
     parser.add_argument('--data-dir', type=str, help='GCS location, where data is stored',
                         required=True)
     parser.add_argument('--save-dir', type=str, help='GCS location to store trained model',
