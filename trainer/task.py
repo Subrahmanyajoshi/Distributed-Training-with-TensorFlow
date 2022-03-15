@@ -16,11 +16,10 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from trainer.helpers.gcs_callback import GCSCallback
-
 sys.path.append('/content/Distributed-Training-with-Tensorflow')
 
 from trainer.helpers.tf_datasets import NumpyArrayDataset
+from trainer.helpers.gcs_callback import GCSCallback
 from trainer.helpers.models import HybridModel
 
 
@@ -109,7 +108,8 @@ class Trainer(object):
 
         self.save_tokenizer()
         print(f"Dumping tokenizer pickle file to {self.output_dir}")
-        os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
+        # os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
+        os.system(f"cp -r ./parser_output {self.output_dir}")
 
         """ Mirrored Strategy """
         # Use mirrored strategy to distribute training across multiple GPUs
