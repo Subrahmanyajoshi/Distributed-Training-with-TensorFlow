@@ -145,12 +145,13 @@ class Trainer(object):
                                                                                        embedding_dim=200)
             model.summary()
 
+            steps_per_epoch = int(X_train.size / batch_size)
             print("[Trainer::train] Started training")
             _ = model.fit(
                 train_dataset,
                 validation_data=val_dataset,
                 epochs=3,
-                steps_per_epoch=1024,
+                steps_per_epoch=steps_per_epoch,
                 callbacks=[cp_callback]
             )
 
