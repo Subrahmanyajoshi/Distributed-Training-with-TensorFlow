@@ -113,15 +113,19 @@ class Trainer(object):
 
         """ Mirrored Strategy """
         # Use mirrored strategy to distribute training across multiple GPUs
-        mirrored_strategy = tf.distribute.MirroredStrategy()
+        # strategy = tf.distribute.MirroredStrategy()
 
         """ TPU Strategy """
         # Use TPU strategy while running training on a TPU
-        # tpu_strategy = tf.distribute.TPUStrategy()
+        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu='10.89.158.162:8470')
+        tf.config.experimental_connect_to_cluster(resolver)
+        tf.tpu.experimental.initialize_tpu_system(resolver)
+        strategy = tf.distribute.TPUStrategy(resolver)
+        # strategy = tf.distribute.TPUStrategy()
 
-        with mirrored_strategy.scope():
+        with strategy.scope():
             # Updating batch size by multiplying it with the number of accelerators available
-            batch_size = self.batch_size * mirrored_strategy.num_replicas_in_sync
+            batch_size = self.batch_size * strategy.num_replicas_in_sync
 
             train_dataset = NumpyArrayDataset.input_fn(X=X_train, y=y_train, batch_size=batch_size, mode='train')
             val_dataset = NumpyArrayDataset.input_fn(X=X_val, y=y_val, batch_size=batch_size, mode='eval')
@@ -145,7 +149,7 @@ class Trainer(object):
                                                                                        embedding_dim=200)
             model.summary()
 
-            steps_per_epoch = int(X_train.size / batch_size)
+            steps_per_epoch = int(y_train.size / batch_size)
             print("[Trainer::train] Started training")
             _ = model.fit(
                 train_dataset,
