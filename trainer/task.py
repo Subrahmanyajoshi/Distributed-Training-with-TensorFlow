@@ -117,11 +117,11 @@ class Trainer(object):
 
         """ TPU Strategy """
         # Use TPU strategy while running training on a TPU
-        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu='10.89.158.162:8470')
+        resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
         tf.config.experimental_connect_to_cluster(resolver)
         tf.tpu.experimental.initialize_tpu_system(resolver)
         strategy = tf.distribute.TPUStrategy(resolver)
-        # strategy = tf.distribute.TPUStrategy()
+        print('[Trainer::train] Running on TPU ', resolver.cluster_spec().as_dict()['worker'])
 
         with strategy.scope():
             # Updating batch size by multiplying it with the number of accelerators available
@@ -148,7 +148,6 @@ class Trainer(object):
                                                                                        metrics=["accuracy"],
                                                                                        embedding_dim=200)
             model.summary()
-
             steps_per_epoch = int(y_train.size / batch_size)
             print("[Trainer::train] Started training")
             _ = model.fit(
