@@ -111,17 +111,19 @@ class Trainer(object):
         # os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
         os.system(f"cp -r ./parser_output {self.output_dir}")
 
-        """ Mirrored Strategy """
-        # Use mirrored strategy to distribute training across multiple GPUs
-        # strategy = tf.distribute.MirroredStrategy()
+        """ Mirrored Strategy 
+        # Use mirrored strategy to distribute training across multiple GPUs 
+        """
+        strategy = tf.distribute.MirroredStrategy()
 
-        """ TPU Strategy """
-        # Use TPU strategy while running training on a TPU
-        resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
-        tf.config.experimental_connect_to_cluster(resolver)
-        tf.tpu.experimental.initialize_tpu_system(resolver)
-        strategy = tf.distribute.TPUStrategy(resolver)
-        print('[Trainer::train] Running on TPU ', resolver.cluster_spec().as_dict()['worker'])
+        """ TPU Strategy
+        # Use TPU strategy while running training on a TPU system.
+        """
+        # resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
+        # tf.config.experimental_connect_to_cluster(resolver)
+        # tf.tpu.experimental.initialize_tpu_system(resolver)
+        # strategy = tf.distribute.TPUStrategy(resolver)
+        # print('[Trainer::train] Running on TPU ', resolver.cluster_spec().as_dict()['worker'])
 
         with strategy.scope():
             # Updating batch size by multiplying it with the number of accelerators available
