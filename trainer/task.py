@@ -56,7 +56,7 @@ class Trainer(object):
         os.system('rm -rf trained_model')
 
     def load_data(self):
-        print(f"[Trainer::load_data] Copying data from {self.data_dir} to here...")
+        # print(f"[Trainer::load_data] Copying data from {self.data_dir} to here...")
         # os.system(f"gsutil -m cp -r "
         #           f"{os.path.join(self.data_dir, 'train_val.zip')} ./")
         # with zipfile.ZipFile('train_val.zip', 'r') as zip_ref:
