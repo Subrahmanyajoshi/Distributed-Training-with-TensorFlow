@@ -1,6 +1,7 @@
 import argparse
 import os
 import pickle
+import subprocess
 import sys
 import zipfile
 
@@ -107,23 +108,34 @@ class Trainer(object):
         X_train, y_train, X_val, y_val = self.preprocess()
 
         self.save_tokenizer()
-        print(f"Dumping tokenizer pickle file to {self.output_dir}")
+        print(f"[Trainer::train] Dumping tokenizer pickle file to {self.output_dir}")
         # os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
         os.system(f"cp -r ./parser_output {self.output_dir}")
 
-        """ Mirrored Strategy 
-        # Use mirrored strategy to distribute training across multiple GPUs 
-        """
+        gpu_info = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
+        gpu_info = gpu_info.stdout.decode('utf-8')
+
         strategy = tf.distribute.MirroredStrategy()
 
-        """ TPU Strategy
-        # Use TPU strategy while running training on a TPU system.
-        """
-        # resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
-        # tf.config.experimental_connect_to_cluster(resolver)
-        # tf.tpu.experimental.initialize_tpu_system(resolver)
-        # strategy = tf.distribute.TPUStrategy(resolver)
-        # print('[Trainer::train] Running on TPU ', resolver.cluster_spec().as_dict()['worker'])
+        gpu_found = False
+        if gpu_info.find('failed') >= 0:
+            print('[Trainer::train] Not connected to a GPU')
+        else:
+            gpu_found = True
+            print('[Trainer::train] Found connected GPUs. Using Mirrored Strategy to distribute training')
+
+        if not gpu_found:
+
+            try:
+                # Use TPU strategy while running training on a TPU system.
+                resolver = tf.distribute.cluster_resolver.TPUClusterResolver()  # TPU detection
+                print('[Trainer::train] Found connected TPU: ', resolver.cluster_spec().as_dict()['worker'])
+                print('[Trainer::train] Using TPU strategy to distribute training')
+                tf.config.experimental_connect_to_cluster(resolver)
+                tf.tpu.experimental.initialize_tpu_system(resolver)
+                strategy = tf.distribute.TPUStrategy(resolver)
+            except ValueError:
+                print("[Trainer::train] No connected GPUs or TPU found. Training won't be distributed")
 
         with strategy.scope():
             # Updating batch size by multiplying it with the number of accelerators available
