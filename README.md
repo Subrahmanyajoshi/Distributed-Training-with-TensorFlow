@@ -1,4 +1,4 @@
-# Distributed Training with Tensorflow
+# Distributed Training with TensorFlow
 
 - This repository shows how to distribute training of large Tensorflow models to make it faster.
 - In tensorflow training can be distributed using strategies module.
@@ -11,13 +11,15 @@ how much I tried, I was not able to get multiple GPUs to see how it affects trai
 - A reduced version of original dataset was used after some preprocessing. 
 - Train dataset size was 1,000,000 (1 million). Validation dataset size was 360,000 (360 thousand).
 
-## 1. Mirrored strategy without any GPUs.
+##### By default, the implementation uses Mirrored Strategy. If running on TPU, select TPU strategy [here](https://github.com/Subrahmanyajoshi/Distributed-Training-with-TensorFlow/blob/main/trainer/task.py#L114)
+
+## 1. Mirrored Strategy without any GPUs.
  - Batch size: 512.
  - Time taken: 6171 seconds per epoch (102.85 minutes).
  - Validation Metrics at the end of first epoch: val_loss: 0.2168 - val_accuracy: 0.9129.
  - Couldn't try higher batch sizes as CPU usage was above 90%.
  
-## 2. Mirrored strategy with 1 NVIDIA Tesla P100-PCIe GPU
+## 2. Mirrored Strategy with 1 NVIDIA Tesla P100-PCIe GPU
 ### Experiment 1
 - Batch size: 512.
 - Time taken: 1321 seconds per epoch (22.01 minutes).
@@ -31,7 +33,7 @@ how much I tried, I was not able to get multiple GPUs to see how it affects trai
 - GPU utilization was more than 80%.
 
 
-## 3. TPU strategy with 1 TPU.
+## 3. TPU Strategy with 1 TPU.
 ### Experiment 1
 - Batch size: 512.
 - A TPU system contains 8 TPUs. Hence, the final batch size is multiplied by 8.
