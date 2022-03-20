@@ -6,12 +6,12 @@
 how much I tried, I was not able to get multiple GPUs to see how it affects training time.
 
 ## Note
+- Trainer automatically detects accelerators and selects proper strategy.
 - All the experiments below were run on a Google Colab notebook with 26 GB RAM.
 - Amazon reviews dataset obtained from [kaggle](https://www.kaggle.com/bittlingmayer/amazonreviews) was used.
 - A reduced version of original dataset was used after some preprocessing. 
 - Train dataset size was 1,000,000 (1 million). Validation dataset size was 360,000 (360 thousand).
 
-##### By default, the implementation uses Mirrored Strategy. If running on TPU, select TPU strategy [here](https://github.com/Subrahmanyajoshi/Distributed-Training-with-TensorFlow/blob/main/trainer/task.py#L114)
 
 ## 1. Mirrored Strategy without any GPUs.
  - Batch size: 512.
