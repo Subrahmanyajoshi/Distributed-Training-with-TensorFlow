@@ -31,6 +31,7 @@ class CSVDataset(object):
 
         if mode == 'train':
             dataset = dataset.shuffle(buffer_size=batch_size)
+            dataset = dataset.repeat()
 
         dataset = dataset.prefetch(buffer_size=batch_size)
         return dataset
@@ -44,6 +45,7 @@ class NumpyArrayDataset(object):
 
         if mode == 'train':
             dataset = dataset.shuffle(buffer_size=batch_size)
+            dataset = dataset.repeat()
 
         dataset = dataset.batch(batch_size=batch_size)
         dataset = dataset.prefetch(buffer_size=batch_size)
@@ -67,6 +69,7 @@ class DataFrameDataset(object):
 
         if mode == 'train':
             dataset = dataset.shuffle(buffer_size=batch_size)
+            dataset = dataset.repeat()
 
         dataset = dataset.prefetch(buffer_size=batch_size)
         return dataset
