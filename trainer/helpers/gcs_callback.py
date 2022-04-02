@@ -36,6 +36,8 @@ class GCSCallback(Callback):
         blob.upload_from_filename(src_path)
 
     def on_epoch_end(self, epoch, logs=None):
+        """ Copies checkpoints created in /tmp/checkpoints directory to destination GCS directory"""
+
         # ModelCheckpoint callback will write checkpoints to /tmp/checkpoints directory
         for cp_file in os.listdir('/tmp/checkpoints'):
             src_path = os.path.join('/tmp/checkpoints', cp_file)

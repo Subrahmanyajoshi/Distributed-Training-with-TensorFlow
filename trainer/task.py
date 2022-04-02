@@ -32,6 +32,8 @@ os.environ["KMP_SETTINGS"] = "false"
 class TokenizerDetails(object):
 
     def __init__(self, **kwargs):
+        """ Init method
+        """
         self.tokenizer = kwargs.get('tokenizer', None)
         self.top_k = kwargs.get('top_k', 20000)
         self.max_sequence_length = kwargs.get('max_sequence_length', 500)
@@ -43,6 +45,10 @@ class Trainer(object):
     MAX_SEQUENCE_LENGTH = 500
 
     def __init__(self, arguments: Namespace):
+        """ Init method
+        Args:
+            arguments (Namespace): Namespace object containing user arguments
+        """
         self.tokenizer = Tokenizer(num_words=Trainer.TOP_K)
         self.data_dir = arguments.data_dir
         self.batch_size = arguments.batch_size
@@ -50,13 +56,15 @@ class Trainer(object):
 
     @staticmethod
     def clean_up():
-        """ Deletes temporary directories created while training"""
-
+        """ Deletes temporary directories created while training
+        """
         print(f"[Trainer::cleanup] Cleaning up...")
         os.system('rm *.csv.gz')
         os.system('rm -rf trained_model')
 
     def load_data(self):
+        """ Loads data from train_val.zip file
+        """
         # print(f"[Trainer::load_data] Copying data from {self.data_dir} to here...")
         # os.system(f"gsutil -m cp -r "
         #           f"{os.path.join(self.data_dir, 'train_val.zip')} ./")
@@ -65,12 +73,16 @@ class Trainer(object):
             zip_ref.extractall('./')
 
     def save_tokenizer(self):
+        """ Saves tokenizer object as a pickle file.
+        """
         tokenizer_pickle = TokenizerDetails(tokenizer=self.tokenizer, top_k=Trainer.TOP_K,
                                             max_sequence_length=Trainer.MAX_SEQUENCE_LENGTH)
         with open('parser_output/tokenizer.pickle', 'wb') as handle:
             pickle.dump(tokenizer_pickle, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def preprocess(self) -> Tuple:
+        """ Converts strings to a sequence of integers using keras tokenizer.
+        """
         train_df = pd.read_csv('train_text.csv.gz')
         val_df = pd.read_csv('val_text.csv.gz')
         lines = list(train_df['input']) + list(val_df['input'])
@@ -99,7 +111,8 @@ class Trainer(object):
         return X_train, y_train, X_val, y_val
 
     def train(self):
-
+        """ Creates dataset, preprocesses it, builds model, trains is and saves it to the specified destination directory
+        """
         self.load_data()
         print("[Trainer::train] Loaded data")
         os.makedirs('parser_output', exist_ok=True)
@@ -112,6 +125,7 @@ class Trainer(object):
         # os.system(f"gsutil -m cp -r ./parser_output {self.output_dir}")
         os.system(f"cp -r ./parser_output {self.output_dir}")
 
+        # Checking if GPUs are connected to the system
         gpu_info = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
         gpu_info = gpu_info.stdout.decode('utf-8')
 
@@ -138,6 +152,7 @@ class Trainer(object):
                 print("[Trainer::train] No connected GPUs or TPU found. Training won't be distributed")
 
         with strategy.scope():
+
             # Updating batch size by multiplying it with the number of accelerators available
             batch_size = self.batch_size * strategy.num_replicas_in_sync
 
